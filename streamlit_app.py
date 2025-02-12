@@ -44,7 +44,7 @@ else:
 
     async def analyze_image(image, result_container):
         """Analyzes the image using Gemini."""
-        model = genai.GenerativeModel(model_name='gemini-pro-vision')
+        model = genai.GenerativeModel(model_name='gemini-2.0-flash-exp')
         
         # Prepare image
         if image.mode == 'RGBA':
