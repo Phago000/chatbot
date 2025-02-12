@@ -1,2 +1,5 @@
 streamlit
-openai
+google-generativeai
+Pillow
+PyMuPDF
+numpy
