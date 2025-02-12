@@ -8,6 +8,9 @@ import asyncio
 import fitz  # PyMuPDF
 import numpy as np
 
+# Configuration
+MULTIMODAL_MODEL = 'gemini-2.0-flash-exp'
+
 # Show title and description
 st.title("🏦 Bank Transaction Image Analyzer")
 st.write(
@@ -21,7 +24,7 @@ google_api_key = st.text_input("Google API Key", type="password")
 if not google_api_key:
     st.info("Please add your Google API key to continue.", icon="🔑")
 else:
-    # Initialize Gemini
+    # Initialize Gemini with user's API key
     genai.configure(api_key=google_api_key)
 
     def convert_pdf_to_images(pdf_file):
@@ -34,17 +37,21 @@ else:
         
         for page_num in range(len(doc)):
             page = doc[page_num]
+            # Get the page's image at a higher DPI (300) for better quality
             pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72))
+            
+            # Convert PyMuPDF pixmap to PIL Image
             img_bytes = pix.tobytes("png")
             img = PIL.Image.open(io.BytesIO(img_bytes))
+            
             images.append(img)
         
         doc.close()
         return images
 
-    async def analyze_image(image, result_container):
+    def analyze_image(image, result_container):
         """Analyzes the image using Gemini."""
-        model = genai.GenerativeModel(model_name='gemini-2.0-flash-exp')
+        model = genai.GenerativeModel(model_name=MULTIMODAL_MODEL)
         
         # Prepare image
         if image.mode == 'RGBA':
@@ -55,7 +62,7 @@ else:
         image.save(buffered, format="JPEG")
         img_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
         
-        # Enhanced prompt
+        # Enhanced prompt with account number instructions
         prompt = """
         Analyze this image and extract the following transaction details:
         
@@ -84,7 +91,9 @@ else:
         }
         """
         
-        response = await model.generate_content([prompt, image])
+        # Prepare content and get response
+        contents = [prompt, image]
+        response = model.generate_content(contents)
         
         # Update the result container with the response
         try:
@@ -92,6 +101,7 @@ else:
             with result_container:
                 st.subheader("Analysis Results:")
                 for key, value in result_dict.items():
+                    # Format the display of the results
                     display_key = {
                         "transactionDate": "Transaction Date",
                         "clientBankAccountName": "Client Bank Account Name (Payer)",
@@ -104,45 +114,52 @@ else:
             with result_container:
                 st.write(response.text)
 
-    async def main():
-        uploaded_file = st.file_uploader(
-            "Upload a bank transaction document",
-            type=["png", "jpg", "jpeg", "pdf"]
-        )
+    # Main app functionality
+    st.set_page_config(
+        page_title="Bank Transaction Image Analyzer",
+        page_icon="🏦",
+        layout="wide"
+    )
+    
+    uploaded_file = st.file_uploader(
+        "Upload a bank transaction document",
+        type=["png", "jpg", "jpeg", "pdf"]
+    )
 
-        if uploaded_file:
-            try:
-                if uploaded_file.type == "application/pdf":
-                    images = convert_pdf_to_images(uploaded_file)
-                    st.write(f"Converted PDF to {len(images)} images")
+    if uploaded_file:
+        try:
+            if uploaded_file.type == "application/pdf":
+                images = convert_pdf_to_images(uploaded_file)
+                st.write(f"Converted PDF to {len(images)} images")
+                
+                # Analyze each page
+                for i, image in enumerate(images):
+                    st.write(f"### Page {i+1}")
+                    st.image(image, caption=f"Page {i+1}")
                     
-                    for i, image in enumerate(images):
-                        st.write(f"### Page {i+1}")
-                        st.image(image, caption=f"Page {i+1}")
-                        
-                        result_container = st.empty()
-                        
-                        if st.button(f"Analyze Page {i+1}"):
-                            with st.spinner("Analyzing image..."):
-                                try:
-                                    await analyze_image(image, result_container)
-                                except Exception as e:
-                                    st.error(f"Error during analysis: {str(e)}")
-                else:
-                    image = PIL.Image.open(uploaded_file)
-                    st.image(image, caption="Uploaded Image")
-                    
+                    # Create a container for results
                     result_container = st.empty()
                     
-                    if st.button("Analyze Image"):
+                    if st.button(f"Analyze Page {i+1}"):
                         with st.spinner("Analyzing image..."):
                             try:
-                                await analyze_image(image, result_container)
+                                analyze_image(image, result_container)
                             except Exception as e:
                                 st.error(f"Error during analysis: {str(e)}")
-                                
-            except Exception as e:
-                st.error(f"Error processing file: {str(e)}")
-
-    if __name__ == "__main__":
-        asyncio.run(main())
+            else:
+                # Handle regular image files
+                image = PIL.Image.open(uploaded_file)
+                st.image(image, caption="Uploaded Image")
+                
+                # Create a container for results
+                result_container = st.empty()
+                
+                if st.button("Analyze Image"):
+                    with st.spinner("Analyzing image..."):
+                        try:
+                            analyze_image(image, result_container)
+                        except Exception as e:
+                            st.error(f"Error during analysis: {str(e)}")
+                            
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
