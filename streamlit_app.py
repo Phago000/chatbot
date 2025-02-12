@@ -1,10 +1,17 @@
 import streamlit as st
+
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="Bank Transaction Image Analyzer",
+    page_icon="🏦",
+    layout="wide"
+)
+
 import google.generativeai as genai
 import PIL.Image
 import io
 import json
 import base64
-import asyncio
 import fitz  # PyMuPDF
 import numpy as np
 
@@ -115,12 +122,6 @@ else:
                 st.write(response.text)
 
     # Main app functionality
-    st.set_page_config(
-        page_title="Bank Transaction Image Analyzer",
-        page_icon="🏦",
-        layout="wide"
-    )
-    
     uploaded_file = st.file_uploader(
         "Upload a bank transaction document",
         type=["png", "jpg", "jpeg", "pdf"]
